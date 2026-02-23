@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voice Clone - Nemotron + CosyVoice2</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #0a0a0a; color: #e0e0e0; min-height: 100vh; display: flex; justify-content: center; padding: 20px; }
+.container { max-width: 520px; width: 100%; }
+h1 { font-size: 1.4rem; text-align: center; margin: 20px 0 8px; }
+.sub { text-align: center; color: #888; font-size: 0.85rem; margin-bottom: 24px; }
+.section { background: #1a1a1a; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+.section h2 { font-size: 0.95rem; color: #aaa; margin-bottom: 12px; }
+.rec-btn { width: 100%; padding: 16px; border: none; border-radius: 10px; font-size: 1.1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+.rec-btn.idle { background: #2563eb; color: white; }
+.rec-btn.recording { background: #dc2626; color: white; animation: pulse 1s infinite; }
+.rec-btn.idle:hover { background: #1d4ed8; }
+.rec-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
+.timer { text-align: center; font-size: 2rem; font-variant-numeric: tabular-nums; color: #f59e0b; margin: 12px 0; min-height: 2.4rem; }
+.wave { height: 40px; display: flex; align-items: center; justify-content: center; gap: 3px; margin: 8px 0; }
+.wave .bar { width: 4px; background: #2563eb; border-radius: 2px; transition: height 0.1s; }
+.ref-status { text-align: center; padding: 10px; border-radius: 8px; font-size: 0.9rem; }
+.ref-status.none { background: #1e1e1e; color: #666; }
+.ref-status.ok { background: #052e16; color: #4ade80; }
+textarea { width: 100%; background: #111; border: 1px solid #333; color: #e0e0e0; border-radius: 8px; padding: 12px; font-size: 1rem; resize: vertical; min-height: 80px; font-family: inherit; }
+textarea:focus { outline: none; border-color: #2563eb; }
+.gen-btn { width: 100%; padding: 14px; border: none; border-radius: 10px; font-size: 1.05rem; font-weight: 600; cursor: pointer; background: #7c3aed; color: white; transition: all 0.2s; margin-top: 12px; }
+.gen-btn:hover { background: #6d28d9; }
+.gen-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.status { text-align: center; color: #888; font-size: 0.85rem; margin-top: 10px; min-height: 1.2rem; }
+.result { margin-top: 12px; }
+.result audio { width: 100%; margin-top: 8px; border-radius: 8px; }
+.prompt-area { margin-top: 10px; }
+.prompt-area summary { color: #888; font-size: 0.85rem; cursor: pointer; }
+.prompt-area textarea { margin-top: 8px; min-height: 60px; font-size: 0.9rem; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Voice Clone</h1>
+  <p class="sub">録音した声でAIがしゃべる</p>
+
+  <div class="section">
+    <h2>1. 声を録音（10〜15秒）</h2>
+    <div class="wave" id="wave"></div>
+    <div class="timer" id="timer"></div>
+    <button class="rec-btn idle" id="recBtn" onclick="toggleRec()">録音開始</button>
+    <div class="ref-status none" id="refStatus" style="margin-top:12px">未録音</div>
+    <details class="prompt-area">
+      <summary>読み上げテキスト（任意）</summary>
+      <textarea id="promptText" placeholder="録音時に読んだテキストを入力すると精度UP">こんにちは、濱田裕紀です。AIスタートアップの創業者として、毎日新しい技術に挑戦しています。今日は皆さんに、私たちが開発しているプロダクトについてお話しします。</textarea>
+    </details>
+  </div>
+
+  <div class="section">
+    <h2>2. しゃべらせたいテキスト</h2>
+    <textarea id="synthText" placeholder="ここに入力したテキストをあなたの声で読み上げます">宇宙人が地球に到着したら、まずは地球で最も謎めいた食べ物である納豆を提供すべきです。</textarea>
+    <button class="gen-btn" id="genBtn" onclick="generate()" disabled>生成</button>
+    <div class="status" id="status"></div>
+    <div class="result" id="result"></div>
+  </div>
+</div>
+
+<script>
+const API_KEY = localStorage.getItem('runpod_key') || '';
+const ENDPOINT_ID = localStorage.getItem('runpod_endpoint') || '';
+const ENDPOINT = `https://api.runpod.ai/v2/${ENDPOINT_ID}`;
+
+if (!API_KEY || !ENDPOINT_ID) {
+  const k = prompt('RunPod API Key:');
+  const e = prompt('RunPod Endpoint ID:', '5g3qns2nhv3s9h');
+  if (k) localStorage.setItem('runpod_key', k);
+  if (e) localStorage.setItem('runpod_endpoint', e);
+  location.reload();
+}
+
+let mediaRec, audioChunks, refBase64, stream, timerInterval, startTime;
+let analyser, dataArray;
+
+// Wave visualizer
+const wave = document.getElementById('wave');
+for (let i = 0; i < 32; i++) {
+  const bar = document.createElement('div');
+  bar.className = 'bar';
+  bar.style.height = '4px';
+  wave.appendChild(bar);
+}
+const bars = wave.querySelectorAll('.bar');
+
+function drawWave() {
+  if (!analyser) return;
+  analyser.getByteFrequencyData(dataArray);
+  const step = Math.floor(dataArray.length / bars.length);
+  bars.forEach((b, i) => {
+    const v = dataArray[i * step] || 0;
+    b.style.height = Math.max(4, v / 255 * 40) + 'px';
+    b.style.background = mediaRec?.state === 'recording' ? '#dc2626' : '#2563eb';
+  });
+  if (mediaRec?.state === 'recording') requestAnimationFrame(drawWave);
+}
+
+function updateTimer() {
+  const s = ((Date.now() - startTime) / 1000).toFixed(1);
+  document.getElementById('timer').textContent = s + 's';
+}
+
+async function toggleRec() {
+  const btn = document.getElementById('recBtn');
+  if (mediaRec?.state === 'recording') {
+    mediaRec.stop();
+    clearInterval(timerInterval);
+    btn.textContent = '録音開始';
+    btn.className = 'rec-btn idle';
+    stream.getTracks().forEach(t => t.stop());
+    bars.forEach(b => { b.style.height = '4px'; b.style.background = '#2563eb'; });
+    return;
+  }
+
+  stream = await navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000, channelCount: 1 } });
+  const ctx = new AudioContext();
+  const src = ctx.createMediaStreamSource(stream);
+  analyser = ctx.createAnalyser();
+  analyser.fftSize = 256;
+  dataArray = new Uint8Array(analyser.frequencyBinCount);
+  src.connect(analyser);
+
+  audioChunks = [];
+  mediaRec = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+  mediaRec.ondataavailable = e => audioChunks.push(e.data);
+  mediaRec.onstop = () => {
+    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      refBase64 = reader.result.split(',')[1];
+      const el = document.getElementById('refStatus');
+      el.textContent = `録音OK (${(blob.size / 1024).toFixed(0)}KB)`;
+      el.className = 'ref-status ok';
+      document.getElementById('genBtn').disabled = false;
+    };
+    reader.readAsDataURL(blob);
+    ctx.close();
+  };
+
+  mediaRec.start();
+  startTime = Date.now();
+  timerInterval = setInterval(updateTimer, 100);
+  btn.textContent = '録音停止';
+  btn.className = 'rec-btn recording';
+  requestAnimationFrame(drawWave);
+
+  // Auto-stop at 15s
+  setTimeout(() => { if (mediaRec?.state === 'recording') toggleRec(); }, 15000);
+}
+
+async function generate() {
+  if (!refBase64) return;
+  const text = document.getElementById('synthText').value.trim();
+  if (!text) return alert('テキストを入力してください');
+
+  const btn = document.getElementById('genBtn');
+  const status = document.getElementById('status');
+  const result = document.getElementById('result');
+  btn.disabled = true;
+  result.innerHTML = '';
+  status.textContent = '送信中...';
+
+  try {
+    const body = {
+      input: {
+        text,
+        mode: 'zero_shot',
+        prompt_audio: refBase64,
+        prompt_text: document.getElementById('promptText').value.trim(),
+        format: 'mp3'
+      }
+    };
+
+    // Submit async job
+    const runRes = await fetch(`${ENDPOINT}/run`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const job = await runRes.json();
+    const jobId = job.id;
+    status.textContent = `処理中... (job: ${jobId?.slice(0, 8)})`;
+
+    // Poll
+    for (let i = 0; i < 60; i++) {
+      await new Promise(r => setTimeout(r, 3000));
+      const res = await fetch(`${ENDPOINT}/status/${jobId}`, {
+        headers: { 'Authorization': `Bearer ${API_KEY}` }
+      });
+      const data = await res.json();
+      status.textContent = `${data.status}... (${(i + 1) * 3}s)`;
+
+      if (data.status === 'COMPLETED') {
+        const out = data.output || {};
+        if (out.error) { status.textContent = `Error: ${out.error}`; break; }
+        if (out.audio_base64) {
+          const bytes = Uint8Array.from(atob(out.audio_base64), c => c.charCodeAt(0));
+          const blob = new Blob([bytes], { type: 'audio/mpeg' });
+          const url = URL.createObjectURL(blob);
+          result.innerHTML = `<audio controls autoplay src="${url}"></audio>`;
+          status.textContent = `完了! (${out.duration_ms}ms, ${(bytes.length / 1024).toFixed(0)}KB)`;
+        }
+        break;
+      }
+      if (data.status === 'FAILED') {
+        status.textContent = `失敗: ${JSON.stringify(data.output?.error || data).slice(0, 200)}`;
+        break;
+      }
+    }
+  } catch (e) {
+    status.textContent = `Error: ${e.message}`;
+  }
+  btn.disabled = false;
+}
+</script>
+</body>
+</html>
