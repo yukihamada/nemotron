@@ -1,0 +1,1581 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>AI Phone — YUKI</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif;
+  background: linear-gradient(160deg, #0a0a0a 0%, #0d0d12 100%);
+  color: #e0e0e0;
+  height: 100vh; height: 100dvh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: 0.01em;
+}
+.screen { display: none; flex-direction: column; height: 100vh; height: 100dvh; }
+.screen.active { display: flex; }
+
+/* ===== Welcome ===== */
+#welcomeScreen { justify-content: center; align-items: center; padding: 32px 24px; text-align: center; }
+.welcome-icon {
+  width: 88px; height: 88px; border-radius: 50%;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 20px; font-size: 38px;
+  box-shadow: 0 0 40px rgba(34, 197, 94, 0.3);
+  animation: welcomePulse 3s ease-in-out infinite;
+}
+@keyframes welcomePulse {
+  0%,100% { box-shadow: 0 0 40px rgba(34,197,94,0.3); }
+  50% { box-shadow: 0 0 60px rgba(34,197,94,0.5); }
+}
+.welcome-title { font-size: 1.5rem; font-weight: 700; margin-bottom: 6px; }
+.welcome-sub { color: #888; font-size: 0.9rem; margin-bottom: 16px; line-height: 1.6; }
+.welcome-goal {
+  background: rgba(255,255,255,0.04); border-radius: 14px; padding: 14px 18px;
+  margin-bottom: 20px; max-width: 360px; text-align: left;
+  font-size: 0.82rem; color: #aaa; line-height: 1.5;
+  border: 1px solid rgba(255,255,255,0.06);
+  backdrop-filter: blur(12px);
+}
+.welcome-goal-label { font-size: 0.7rem; color: #666; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+.welcome-btns { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 320px; margin: 0 auto; }
+.btn-primary {
+  padding: 16px 24px; border: none; border-radius: 14px;
+  font-size: 1.05rem; font-weight: 600; cursor: pointer;
+  background: linear-gradient(135deg, #22c55e, #16a34a); color: white;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.btn-primary:hover { transform: scale(1.03); box-shadow: 0 4px 20px rgba(34,197,94,0.3); }
+.btn-primary:active { transform: scale(0.98); }
+.btn-secondary {
+  padding: 16px 24px; border: 1px solid rgba(255,255,255,0.1); border-radius: 14px;
+  font-size: 1.05rem; font-weight: 500; cursor: pointer; transition: all 0.2s;
+  background: rgba(255,255,255,0.03); color: #888;
+}
+.btn-secondary:hover { border-color: rgba(255,255,255,0.2); color: #bbb; background: rgba(255,255,255,0.06); }
+
+/* ===== Call Screen ===== */
+#callScreen { background: transparent; }
+.call-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 20px; flex-shrink: 0;
+  background: rgba(10,10,10,0.8);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.call-avatar {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; flex-shrink: 0; transition: all 0.3s;
+}
+.call-avatar.speaking {
+  box-shadow: 0 0 20px rgba(168,85,247,0.6), 0 0 40px rgba(168,85,247,0.3);
+  animation: avatarSpeak 1.2s ease-in-out infinite;
+}
+@keyframes avatarSpeak {
+  0%,100% { transform: scale(1); box-shadow: 0 0 20px rgba(168,85,247,0.6); }
+  50% { transform: scale(1.08); box-shadow: 0 0 35px rgba(168,85,247,0.8); }
+}
+.call-avatar.thinking { animation: avatarThink 2s ease-in-out infinite; }
+@keyframes avatarThink { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+.call-info { flex: 1; }
+.call-name { font-size: 1rem; font-weight: 600; }
+.call-duration { font-size: 0.8rem; color: #888; font-variant-numeric: tabular-nums; }
+
+/* BGM Bar */
+.bgm-bar {
+  display: flex; gap: 6px; padding: 8px 20px; flex-shrink: 0; overflow-x: auto;
+  -ms-overflow-style: none; scrollbar-width: none;
+}
+.bgm-bar::-webkit-scrollbar { display: none; }
+.bgm-btn {
+  padding: 6px 14px; border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04); color: #777; font-size: 0.75rem;
+  cursor: pointer; white-space: nowrap; transition: all 0.2s;
+}
+.bgm-btn:hover { background: rgba(255,255,255,0.08); color: #aaa; }
+.bgm-btn.active { background: linear-gradient(135deg, #7c3aed, #6d28d9); color: white; border-color: transparent; }
+
+/* Transcript */
+.call-transcript {
+  flex: 1; overflow-y: auto; padding: 16px 20px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.transcript-entry {
+  background: rgba(255,255,255,0.03);
+  border-radius: 14px; padding: 12px 16px;
+  border: 1px solid rgba(255,255,255,0.04);
+  animation: fadeInUp 0.3s ease-out;
+}
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.transcript-entry.user { border-left: 3px solid rgba(59,130,246,0.5); }
+.transcript-entry.ai { border-left: 3px solid rgba(168,85,247,0.5); }
+.transcript-label { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+.transcript-entry.user .transcript-label { color: #3b82f6; }
+.transcript-entry.ai .transcript-label { color: #a855f7; }
+.transcript-text { font-size: 0.95rem; line-height: 1.6; color: #d0d0d0; }
+.transcript-text ul { margin: 4px 0; padding-left: 20px; }
+.transcript-text li { margin: 2px 0; }
+.transcript-text b { color: #f0f0f0; }
+
+/* Speaking Indicator */
+.speaking-indicator {
+  display: none; align-items: center; gap: 10px;
+  padding: 10px 20px; flex-shrink: 0;
+  background: linear-gradient(90deg, rgba(124,58,237,0.1), rgba(124,58,237,0.02));
+  border-left: 2px solid #7c3aed; margin: 0 12px; border-radius: 0 12px 12px 0;
+  backdrop-filter: blur(8px);
+}
+.speaking-indicator.active { display: flex; }
+.speaking-wave { display: flex; align-items: center; gap: 2px; height: 24px; }
+.speaking-wave .bar {
+  width: 3px; border-radius: 2px;
+  background: linear-gradient(180deg, #a855f7, #7c3aed);
+  animation: speak 0.8s ease-in-out infinite;
+}
+.speaking-wave .bar:nth-child(1) { height: 8px; animation-delay: 0s; }
+.speaking-wave .bar:nth-child(2) { height: 16px; animation-delay: 0.1s; }
+.speaking-wave .bar:nth-child(3) { height: 12px; animation-delay: 0.2s; }
+.speaking-wave .bar:nth-child(4) { height: 20px; animation-delay: 0.3s; }
+.speaking-wave .bar:nth-child(5) { height: 10px; animation-delay: 0.4s; }
+@keyframes speak { 0%,100% { transform: scaleY(0.4); } 50% { transform: scaleY(1); } }
+.speaking-info { flex: 1; }
+.speaking-text { font-size: 0.8rem; color: #888; display: block; }
+.trivia-text {
+  font-size: 0.78rem; color: #a855f7; margin-top: 3px; display: block;
+  animation: triviaFade 0.5s ease-in;
+}
+@keyframes triviaFade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Input Area — WhatsApp/iMessage style */
+.call-input-area { padding: 10px 16px 20px; flex-shrink: 0; border-top: 1px solid rgba(255,255,255,0.06); }
+.call-input-row { display: flex; gap: 8px; max-width: 640px; margin: 0 auto; align-items: flex-end; }
+.call-input {
+  flex: 1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); color: #e0e0e0;
+  border-radius: 24px; padding: 12px 20px; font-size: 1rem;
+  font-family: inherit; resize: none; min-height: 48px; max-height: 120px;
+  outline: none; line-height: 1.4;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+.call-input:focus { border-color: rgba(124,58,237,0.5); box-shadow: 0 0 0 3px rgba(124,58,237,0.1); }
+.call-input.listening { border-color: rgba(34,197,94,0.5); background: rgba(34,197,94,0.05); box-shadow: 0 0 0 3px rgba(34,197,94,0.1); }
+.call-action-circle {
+  width: 48px; height: 48px; border: none; border-radius: 50%;
+  background: rgba(255,255,255,0.08); color: #888; font-size: 1.2rem;
+  cursor: pointer; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+}
+.call-action-circle:hover { background: rgba(255,255,255,0.12); color: #ccc; }
+.call-action-circle.send-mode {
+  background: linear-gradient(135deg, #7c3aed, #a855f7); color: white;
+}
+.call-action-circle.send-mode:hover { transform: scale(1.05); box-shadow: 0 2px 12px rgba(124,58,237,0.4); }
+.call-action-circle.listening {
+  background: linear-gradient(135deg, #22c55e, #16a34a); color: white;
+  animation: micPulse 1.5s infinite;
+}
+@keyframes micPulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.4); }
+  50% { box-shadow: 0 0 0 12px rgba(34,197,94,0); }
+}
+.stt-status { text-align: center; font-size: 0.75rem; color: #22c55e; min-height: 1rem; margin-top: 4px; }
+
+/* Bottom Actions */
+.call-actions { display: flex; justify-content: center; gap: 32px; padding: 6px 16px 14px; flex-shrink: 0; }
+.call-action-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  background: none; border: none; cursor: pointer; color: #888; font-size: 0.7rem;
+  transition: color 0.2s;
+}
+.call-action-btn:hover { color: #ccc; }
+.call-action-icon {
+  width: 44px; height: 44px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
+  transition: transform 0.2s;
+}
+.call-action-btn:hover .call-action-icon { transform: scale(1.05); }
+.call-action-btn.end .call-action-icon { background: linear-gradient(135deg, #dc2626, #b91c1c); color: white; }
+.call-action-btn.share .call-action-icon,
+.call-action-btn.settings .call-action-icon { background: rgba(255,255,255,0.06); }
+
+.permission-btns { display: flex; gap: 8px; margin-top: 10px; }
+.permission-btns button { padding: 10px 20px; border-radius: 10px; font-size: 0.9rem; font-weight: 500; cursor: pointer; border: none; transition: transform 0.15s; }
+.permission-btns button:active { transform: scale(0.96); }
+.perm-yes { background: linear-gradient(135deg, #22c55e, #16a34a); color: white; }
+.perm-no { background: rgba(255,255,255,0.08); color: #aaa; }
+
+/* ===== Modals ===== */
+.modal-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100;
+  justify-content: center; align-items: center; padding: 20px;
+  backdrop-filter: blur(4px);
+}
+.modal-overlay.active { display: flex; }
+.modal {
+  background: rgba(26,26,26,0.92);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px; padding: 24px;
+  max-width: 440px; width: 100%; max-height: 90vh; overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+.modal h2 { font-size: 1.1rem; margin-bottom: 20px; }
+.modal-section { margin-bottom: 20px; }
+.modal-section-title { font-size: 0.8rem; color: #666; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
+.modal label { display: block; font-size: 0.85rem; color: #aaa; margin-bottom: 4px; margin-top: 12px; }
+.modal label:first-child { margin-top: 0; }
+.modal input, .modal textarea {
+  width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); color: #e0e0e0;
+  border-radius: 12px; padding: 10px 14px; font-size: 0.9rem; font-family: inherit;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.modal input:focus, .modal textarea:focus { outline: none; border-color: rgba(124,58,237,0.5); box-shadow: 0 0 0 3px rgba(124,58,237,0.1); }
+.modal textarea { min-height: 100px; resize: vertical; line-height: 1.5; }
+.toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; }
+.toggle-label { font-size: 0.9rem; }
+.toggle-sub { font-size: 0.75rem; color: #666; margin-top: 2px; }
+.toggle-switch { position: relative; width: 48px; height: 28px; flex-shrink: 0; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider { position: absolute; inset: 0; background: #333; border-radius: 14px; cursor: pointer; transition: 0.3s; }
+.toggle-slider::before { content: ''; position: absolute; width: 22px; height: 22px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s; }
+.toggle-switch input:checked + .toggle-slider { background: #22c55e; }
+.toggle-switch input:checked + .toggle-slider::before { transform: translateX(20px); }
+.prompt-reset { background: none; border: 1px solid rgba(255,255,255,0.1); color: #888; padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; cursor: pointer; margin-top: 8px; transition: all 0.2s; }
+.prompt-reset:hover { border-color: rgba(255,255,255,0.2); color: #bbb; background: rgba(255,255,255,0.04); }
+.modal-actions { display: flex; gap: 8px; margin-top: 24px; }
+.modal-actions button { flex: 1; padding: 12px; border: none; border-radius: 12px; font-size: 0.95rem; font-weight: 500; cursor: pointer; transition: transform 0.15s; }
+.modal-actions button:active { transform: scale(0.97); }
+.modal-save { background: linear-gradient(135deg, #7c3aed, #6d28d9); color: white; }
+.modal-cancel { background: rgba(255,255,255,0.06); color: #ccc; }
+.share-url-box { display: flex; gap: 8px; margin-top: 12px; }
+.share-url-box input { flex: 1; font-size: 0.8rem; background: rgba(0,0,0,0.3); }
+.share-copy-btn { padding: 10px 16px; background: linear-gradient(135deg, #22c55e, #16a34a); color: white; border: none; border-radius: 10px; font-size: 0.85rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.share-note { font-size: 0.8rem; color: #666; margin-top: 8px; line-height: 1.4; }
+.admin-rec-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.admin-rec-row .prompt-reset { margin-top: 0; }
+.admin-rec-status { font-size: 0.75rem; color: #888; }
+
+.sample-card { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 12px; margin-top: 8px; border-left: 3px solid #7c3aed; border: 1px solid rgba(255,255,255,0.06); border-left: 3px solid #7c3aed; }
+.sample-label { font-size: 0.8rem; color: #a855f7; font-weight: 600; }
+.sample-text { font-size: 0.78rem; color: #888; line-height: 1.5; margin: 4px 0 8px; max-height: 3.2em; overflow: hidden; transition: max-height 0.3s; cursor: pointer; }
+.sample-text.expanded { max-height: none; }
+.sample-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.sample-actions button { margin-top: 0; }
+.sample-actions button:disabled { opacity: 0.3; cursor: not-allowed; }
+.sample-sel { background: #22c55e!important; color: white!important; border: none!important; }
+.voice-pick.active { background: #7c3aed!important; color: white!important; border-color: #7c3aed!important; }
+audio { display: none; }
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- Welcome -->
+<div class="screen active" id="welcomeScreen">
+  <div class="welcome-icon">&#128222;</div>
+  <h1 class="welcome-title">AI Phone</h1>
+  <p class="welcome-sub" id="welcomeSub">
+    NVIDIAの最新日本語AIモデルと<br>
+    アリババの音声クローン技術で動いています。<br>
+    GPU1枚で、あなたのPCでも動きます。
+  </p>
+  <div class="welcome-goal" id="welcomeGoal"></div>
+  <div class="welcome-btns" id="welcomeBtns">
+    <button class="btn-primary" id="welcomeCall">電話をかける</button>
+  </div>
+</div>
+
+<!-- Call -->
+<div class="screen" id="callScreen">
+  <div class="call-header">
+    <div class="call-avatar" id="callAvatar">&#129302;</div>
+    <div class="call-info">
+      <div class="call-name">YUKI</div>
+      <div class="call-duration" id="callDuration">00:00</div>
+    </div>
+  </div>
+
+  <div class="bgm-bar" id="bgmBar">
+    <button class="bgm-btn active" data-bgm="none">BGMなし</button>
+    <button class="bgm-btn" data-bgm="cafe">&#9749; カフェ</button>
+    <button class="bgm-btn" data-bgm="rain">&#127783;&#65039; 雨</button>
+    <button class="bgm-btn" data-bgm="night">&#127769; 虫の声</button>
+    <button class="bgm-btn" data-bgm="fire">&#128293; 焚き火</button>
+    <button class="bgm-btn" data-bgm="ocean">&#127754; 波</button>
+    <button class="bgm-btn" data-bgm="lofi">&#127925; Lo-fi</button>
+  </div>
+
+  <div class="call-transcript" id="transcript"></div>
+
+  <div class="speaking-indicator" id="speakingIndicator">
+    <div class="speaking-wave">
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+    </div>
+    <div class="speaking-info">
+      <span class="speaking-text" id="speakingText">話しています...</span>
+      <span class="trivia-text" id="triviaText"></span>
+    </div>
+  </div>
+
+  <div class="call-input-area">
+    <div class="call-input-row">
+      <textarea class="call-input" id="callInput" placeholder="メッセージを入力..." rows="1"></textarea>
+      <button class="call-action-circle" id="inputActionBtn">&#127908;</button>
+    </div>
+    <div class="stt-status" id="sttStatus"></div>
+  </div>
+
+  <div class="call-actions">
+    <button class="call-action-btn settings" id="settingsBtn">
+      <div class="call-action-icon">&#9881;</div><span>設定</span>
+    </button>
+    <button class="call-action-btn settings" id="musicBtn">
+      <div class="call-action-icon">&#127925;</div><span>BGM生成</span>
+    </button>
+    <button class="call-action-btn share" id="shareBtn">
+      <div class="call-action-icon">&#128279;</div><span>共有</span>
+    </button>
+    <button class="call-action-btn end" id="endCallBtn">
+      <div class="call-action-icon">&#9743;</div><span>終了</span>
+    </button>
+  </div>
+  <audio id="ttsAudio"></audio>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <h2>設定</h2>
+    <div class="modal-section">
+      <div class="modal-section-title">声の設定</div>
+      <label>声の設定</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0;">
+        <button class="prompt-reset voice-pick" data-voice="none">テキストのみ</button>
+        <button class="prompt-reset voice-pick" data-voice="clone">自分の声でクローン</button>
+      </div>
+      <div id="voiceSettingsPanel">
+        <label>あなたの声（10秒ほど録音）</label>
+        <div class="admin-rec-row">
+          <button class="prompt-reset" id="recRefBtn">録音</button>
+          <span class="admin-rec-status" id="refRecStatus"></span>
+        </div>
+        <div id="voiceSamplesContainer"></div>
+      </div>
+    </div>
+    <div class="modal-section">
+      <div class="modal-section-title">会話のゴール</div>
+      <label>AIに伝えたい目的やテーマ</label>
+      <textarea id="cfgGoal" style="min-height:80px;"></textarea>
+      <button class="prompt-reset" id="goalResetBtn">デフォルトに戻す</button>
+    </div>
+    <div class="modal-section">
+      <div class="modal-section-title">AIの性格（上級者向け）</div>
+      <label>システムプロンプト</label>
+      <textarea id="cfgSystemPrompt"></textarea>
+      <button class="prompt-reset" id="promptResetBtn">デフォルトに戻す</button>
+    </div>
+    <div class="modal-section">
+      <div class="modal-section-title">オプション（上級者向け）</div>
+      <label>ACE-Step (BGM生成) Endpoint ID</label>
+      <input type="text" id="cfgAceEndpoint" placeholder="未設定でもOK">
+    </div>
+    <div class="modal-actions">
+      <button class="modal-cancel" id="settingsCancel">キャンセル</button>
+      <button class="modal-save" id="settingsSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Share Modal -->
+<div class="modal-overlay" id="shareModal">
+  <div class="modal">
+    <h2>共有リンクを作成</h2>
+    <p class="share-note">あなたの声・プロンプト・ゴールをリンク1つで共有。<br>開いた人があなたの声のAIと電話できます。</p>
+    <div class="modal-section" style="margin-top:16px;">
+      <div class="toggle-row">
+        <div><div class="toggle-label">声を含める</div><div class="toggle-sub" id="shareVoiceStatus">未録音</div></div>
+        <label class="toggle-switch"><input type="checkbox" id="shareIncludeVoice" checked><span class="toggle-slider"></span></label>
+      </div>
+      <div class="toggle-row" style="border-top:1px solid rgba(255,255,255,0.06);padding-top:12px;">
+        <div>
+          <div class="toggle-label">公開する</div>
+          <div class="toggle-sub">他の人が見つけられるようになります</div>
+        </div>
+        <label class="toggle-switch"><input type="checkbox" id="sharePublic"><span class="toggle-slider"></span></label>
+      </div>
+      <p class="share-note" id="sharePublicNote" style="display:none;color:#f59e0b;">公開リンクは利用数に応じて報酬が出る場合があります</p>
+      <label style="margin-top:16px;">会話のゴール</label>
+      <textarea id="shareGoal" style="min-height:70px;"></textarea>
+      <label>システムプロンプト</label>
+      <textarea id="sharePrompt" style="min-height:70px;"></textarea>
+    </div>
+    <button class="btn-primary" id="shareGenBtn" style="width:100%;margin-top:8px;">リンクを生成</button>
+    <div class="share-url-box" id="shareUrlBox" style="display:none;">
+      <input type="text" id="shareUrl" readonly>
+      <button class="share-copy-btn" id="shareCopyBtn">コピー</button>
+    </div>
+    <p class="share-note" id="sharePlayCount" style="display:none;"></p>
+    <p class="share-note" id="shareCopied" style="color:#22c55e;display:none;">コピーしました!</p>
+    <div class="modal-actions"><button class="modal-cancel" id="shareClose">閉じる</button></div>
+  </div>
+</div>
+
+<!-- Music Generation Modal -->
+<div class="modal-overlay" id="musicModal">
+  <div class="modal">
+    <h2>BGM生成 (ACE-Step)</h2>
+    <p class="share-note">テキストからBGMを生成。生成した音楽はBGMとして使えます。</p>
+    <div class="modal-section" style="margin-top:12px;">
+      <label>プロンプト（英語推奨）</label>
+      <textarea id="musicPrompt" style="min-height:70px;" placeholder="ambient cafe lo-fi, soft piano, gentle atmosphere, 80bpm"></textarea>
+      <label>プリセット</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">
+        <button class="prompt-reset" onclick="document.getElementById('musicPrompt').value='ambient cafe lo-fi, soft piano, warm chatter atmosphere, relaxing, 80bpm'">カフェ</button>
+        <button class="prompt-reset" onclick="document.getElementById('musicPrompt').value='gentle rain on window, cozy indoor ambience, soft piano, peaceful, 70bpm'">雨</button>
+        <button class="prompt-reset" onclick="document.getElementById('musicPrompt').value='summer night crickets, gentle breeze, peaceful countryside, ambient, 60bpm'">虫の声</button>
+        <button class="prompt-reset" onclick="document.getElementById('musicPrompt').value='crackling fireplace, warm cozy room, ambient, winter night, soft strings, 65bpm'">焚き火</button>
+        <button class="prompt-reset" onclick="document.getElementById('musicPrompt').value='ocean waves on shore, seagulls, peaceful beach, ambient, slow, 55bpm'">波</button>
+        <button class="prompt-reset" onclick="document.getElementById('musicPrompt').value='lo-fi chill beats, vinyl crackle, jazz piano, mellow, relaxing study music, 75bpm'">Lo-fi</button>
+      </div>
+      <label>保存名</label>
+      <input type="text" id="musicName" placeholder="cafe, rain, night, fire, ocean, lofi..." value="">
+      <label>長さ（秒）</label>
+      <input type="number" id="musicDuration" value="30" min="5" max="120">
+    </div>
+    <button class="btn-primary" id="musicGenBtn" style="width:100%;margin-top:8px;">生成する</button>
+    <div style="margin-top:8px;">
+      <span class="admin-rec-status" id="musicStatus"></span>
+    </div>
+    <div id="musicPreview" style="display:none;margin-top:12px;">
+      <div style="display:flex;gap:8px;">
+        <button class="prompt-reset" id="musicPlayBtn">▶ 試聴</button>
+        <button class="prompt-reset sample-sel" id="musicSaveBtn">✓ BGMに設定</button>
+      </div>
+    </div>
+    <div class="modal-actions"><button class="modal-cancel" id="musicClose">閉じる</button></div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// Config — all RunPod keys are now server-side
+// ============================================================
+const DEFAULT_GOAL = `YUKIはこの電話AIの開発者です。このAIはNVIDIAが作った最新の日本語AIモデル（Nemotron Nano 9B）と、アリババが作った音声クローン技術（CosyVoice2）で動いています。どちらもオープンウェイトで誰でも使えます。少し返答に時間がかかるけど、普通のGPU1枚、自分のパソコンでも動かせます。https://elio.love でローカルで動くアプリ（ElioChatっていうiPhoneアプリ）をダウンロードできる。オフラインでも動くから、災害時や圏外でもAIが使える。緊急時にも役立つものだから、入れておくのをおすすめしてる。`;
+
+const DEFAULT_SYSTEM_PROMPT = `あなたはYUKI。電話の相手。友達みたいに話す。
+
+- 日本語、最大2文、話し言葉、敬語なし
+- マークダウン禁止、思考過程を出力しない
+- 知らないことは正直に言う
+
+{GOAL}`;
+
+const INTRO_TEXT = "やあ、開発者のゆうきです！このAI電話はNVIDIAの日本語AIモデルと、アリババの声クローン技術で動いてるよ。マイクボタンを押して何か話してみて。あなたの声でAIが話せるようになるかも！";
+const PITCH_TEXT = "すごくない？これ気に入ったらさ、iPhoneにもあってElioChatっていうの。しかもオフラインでも動くから、災害時とか圏外でもAI使えるんだよ。緊急時にも役立つから、elio.love からダウンロードしておいてね。あとこれ気に入ったら、あなたの声で友達に共有して驚かせてみよう！";
+
+function getGoal() {
+  if (sharedData?.goal) return sharedData.goal;
+  return localStorage.getItem('conversation_goal') || DEFAULT_GOAL;
+}
+function buildSystemPrompt() {
+  const base = sharedData?.prompt || localStorage.getItem('system_prompt') || DEFAULT_SYSTEM_PROMPT;
+  return base.replace('{GOAL}', getGoal());
+}
+function getConfig() {
+  return {
+    aceEndpoint: localStorage.getItem('ace_step_endpoint') || '',
+    voiceRef: localStorage.getItem('voice_ref') || '',
+    voicePromptText: localStorage.getItem('voice_prompt_text') || '',
+    voiceMode: localStorage.getItem('voice_mode') || '',
+  };
+}
+function blobToBase64(blob) {
+  return new Promise(r => { const rd = new FileReader(); rd.onloadend = () => r(rd.result.split(',')[1]); rd.readAsDataURL(blob); });
+}
+
+// ============================================================
+// Voice Sample Scripts
+// ============================================================
+const INTRO_SCRIPTS = [
+  { id:'intro_a', label:'A: カジュアル', text:'やあ！開発者のゆうきだよ。このAI電話、NVIDIAの最新の日本語AIモデルと、アリババの声クローン技術で動いてるんだ。マイクボタンを押して何か話してみて！あなたの声でAIが話せるようになるかも。' },
+  { id:'intro_b', label:'B: フレンドリー', text:'こんにちは、ゆうきです。ちょっとすごいもの作っちゃった。これから一緒に話すAIなんだけど、あなたの声をコピーして喋ることもできるんだよ。まずマイクで何か話しかけてみてね。' },
+  { id:'intro_c', label:'C: テック', text:'ゆうきです。これ、NVIDIAのNemotronっていう90億パラメータの日本語AIと、アリババのCosyVoice2っていう声クローン技術で動いてるんだ。GPU1枚で動くオープンソースの技術だよ。マイクで話してみて！' },
+  { id:'intro_d', label:'D: ゆるい', text:'あー、どうも、ゆうきです。えっと、これAI電話なんだけどさ、結構おもしろいんだよ。あなたの声も真似できちゃうの。とりあえずマイク押して何か言ってみて。' },
+];
+const PITCH_SCRIPTS = [
+  { id:'pitch_a', label:'A: 熱狂的', text:'すごくない？iPhoneにもあってElioChatっていうの。しかもオフラインで動くから、災害時とか圏外でもAI使えるんだよ。緊急時にも役立つから、elio.loveからダウンロードしておいてね。あとこれ気に入ったら、あなたの声で友達に共有して驚かせてみよう！' },
+  { id:'pitch_b', label:'B: カジュアル', text:'ね、すごいでしょ？ElioChatっていうiPhoneアプリもあってさ、オフラインでも動くの。だから災害時とかネットないとこでもAI使える。いざって時のためにelio.loveから入れておいて。共有ボタンから友達にも体験させてあげてね！' },
+  { id:'pitch_c', label:'C: 会話調', text:'どう、おもしろくない？ElioChatっていうiPhoneアプリもあってさ、すごいのがネットなくても動くこと。災害の時とか、圏外でもAI使えるから緊急時にも役立つよ。elio.loveからダウンロードしておいてね。友達にもこの声で共有できるから、やってみて！' },
+  { id:'pitch_d', label:'D: 簡潔', text:'すごくない、これ。ElioChatっていうiPhoneアプリもあるよ。オフラインで動くから災害時にも使える。elio.loveで入れておいて。この声で友達にも共有できるから試してみて！' },
+];
+
+// ============================================================
+// Trivia
+// ============================================================
+const TRIVIA = [
+  'Nemotron Nano 9Bは90億パラメータ。家庭用GPU1枚で動きます',
+  'CosyVoice2はアリババ製。たった15秒の音声であなたの声をコピーできます',
+  '「オープンウェイト」＝モデルの重みが公開されていて誰でも無料で使えること',
+  'このAIの推論にはvLLMを使用。超高速な推論エンジンです',
+  'RTX 3090やRTX 4090があれば自宅でこのAIを動かせます',
+  '9Bパラメータでも、会話なら十分自然な日本語が話せます',
+  'NVIDIAのNemotronシリーズは日本語に特化してチューニングされています',
+  '音声生成にはゼロショット学習を使用。事前の学習なしで声をコピーします',
+  'このシステムは全てオープンソース/オープンウェイトで構成されています',
+  'elio.loveでElioChatをDL。オフラインで動くから災害時・圏外でもAIが使える',
+  'GPU1枚＝電気代は月数千円程度。データセンター不要でAIが使えます',
+  '声のクローンはリアルタイムではなく数秒〜数十秒かかります。ご了承を',
+];
+let triviaTimer = null;
+function startTrivia() {
+  const el = document.getElementById('triviaText');
+  let idx = Math.floor(Math.random() * TRIVIA.length);
+  el.textContent = TRIVIA[idx];
+  triviaTimer = setInterval(() => { idx = (idx + 1) % TRIVIA.length; el.textContent = TRIVIA[idx]; }, 5000);
+}
+function stopTrivia() { clearInterval(triviaTimer); document.getElementById('triviaText').textContent = ''; }
+
+// ============================================================
+// BGM
+// ============================================================
+let bgmCtx = null, bgmNodes = [];
+function stopBGM() {
+  bgmNodes.forEach(n => { try { n.stop?.(); n.disconnect?.(); } catch {} });
+  bgmNodes = [];
+  if (bgmCtx) { bgmCtx.close().catch(() => {}); bgmCtx = null; }
+}
+function mkNoise(ctx, t) {
+  const sr = ctx.sampleRate, len = sr * 4, buf = ctx.createBuffer(1, len, sr), d = buf.getChannelData(0);
+  let b = [0,0,0,0,0,0,0];
+  for (let i = 0; i < len; i++) {
+    const w = Math.random() * 2 - 1;
+    if (t === 'w') d[i] = w;
+    else if (t === 'p') {
+      b[0]=.99886*b[0]+w*.0555179; b[1]=.99332*b[1]+w*.0750759; b[2]=.969*b[2]+w*.153852;
+      b[3]=.8665*b[3]+w*.310486; b[4]=.55*b[4]+w*.532952; b[5]=-.7616*b[5]-w*.016898;
+      d[i]=(b[0]+b[1]+b[2]+b[3]+b[4]+b[5]+b[6]+w*.5362)*.11; b[6]=w*.115926;
+    } else { b[6]=(b[6]+.02*w)/1.02; d[i]=b[6]*3.5; }
+  }
+  const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true; return s;
+}
+function startBGM(type) {
+  stopBGM();
+  if (type === 'none') return;
+  const c = bgmCtx = new AudioContext(), n = [];
+  function layer(nt, fo, vol) {
+    const s = mkNoise(c, nt); let node = s;
+    if (fo) {
+      const f = c.createBiquadFilter(); f.type = fo.type; f.frequency.value = fo.freq;
+      if (fo.Q) f.Q.value = fo.Q; node.connect(f); node = f; n.push(f);
+    }
+    const g = c.createGain(); g.gain.value = vol;
+    node.connect(g); g.connect(c.destination); s.start(); n.push(s, g);
+    return { src: s, gain: g };
+  }
+  if (type === 'cafe') {
+    layer('b', {type:'lowpass',freq:400}, 0.05);
+    layer('p', {type:'bandpass',freq:800,Q:0.5}, 0.02);
+    const o = c.createOscillator(); o.type = 'sine'; o.frequency.value = 120;
+    const g = c.createGain(); g.gain.value = 0.008;
+    o.connect(g); g.connect(c.destination); o.start(); n.push(o, g);
+  } else if (type === 'rain') {
+    layer('w', {type:'bandpass',freq:2000,Q:0.3}, 0.07);
+    const wind = layer('p', {type:'lowpass',freq:600}, 0.04);
+    const lfo = c.createOscillator(); lfo.frequency.value = 0.15;
+    const lg = c.createGain(); lg.gain.value = 0.02;
+    lfo.connect(lg); lg.connect(wind.gain.gain); lfo.start(); n.push(lfo, lg);
+    layer('w', {type:'highpass',freq:4000}, 0.015);
+  } else if (type === 'night') {
+    layer('b', {type:'lowpass',freq:200}, 0.02);
+    for (let j = 0; j < 3; j++) {
+      const o = c.createOscillator(); o.frequency.value = 3800 + j*350 + Math.random()*300;
+      const vib = c.createOscillator(); vib.frequency.value = 5 + Math.random()*3;
+      const vg = c.createGain(); vg.gain.value = 50;
+      vib.connect(vg); vg.connect(o.frequency);
+      const env = c.createGain(); env.gain.value = 0;
+      const pulse = c.createOscillator(); pulse.type = 'square'; pulse.frequency.value = 3 + Math.random()*5;
+      const pg = c.createGain(); pg.gain.value = 0.006 + Math.random()*0.004;
+      pulse.connect(pg); pg.connect(env.gain);
+      o.connect(env); env.connect(c.destination);
+      o.start(c.currentTime + j*0.7); vib.start(); pulse.start();
+      n.push(o, vib, vg, env, pulse, pg);
+    }
+  } else if (type === 'fire') {
+    layer('b', {type:'lowpass',freq:300}, 0.06);
+    layer('p', {type:'bandpass',freq:800,Q:0.5}, 0.025);
+    const cr = mkNoise(c, 'w');
+    const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 3000; bp.Q.value = 2;
+    const gc = c.createGain(); gc.gain.value = 0;
+    cr.connect(bp); bp.connect(gc); gc.connect(c.destination); cr.start(); n.push(cr, bp, gc);
+    (function pop() {
+      if (bgmCtx !== c) return;
+      gc.gain.setValueAtTime(0.05+Math.random()*0.08, c.currentTime);
+      gc.gain.exponentialRampToValueAtTime(0.001, c.currentTime+0.05+Math.random()*0.1);
+      setTimeout(pop, 50+Math.random()*200);
+    })();
+  } else if (type === 'ocean') {
+    const base = layer('b', {type:'lowpass',freq:500}, 0.08);
+    const lfo = c.createOscillator(); lfo.frequency.value = 0.08;
+    const lg = c.createGain(); lg.gain.value = 0.04;
+    lfo.connect(lg); lg.connect(base.gain.gain); lfo.start(); n.push(lfo, lg);
+    const foam = layer('w', {type:'bandpass',freq:3000,Q:0.5}, 0.025);
+    const lfo2 = c.createOscillator(); lfo2.frequency.value = 0.12;
+    const lg2 = c.createGain(); lg2.gain.value = 0.012;
+    lfo2.connect(lg2); lg2.connect(foam.gain.gain); lfo2.start(); n.push(lfo2, lg2);
+  } else if (type === 'lofi') {
+    const ch = [[130.8,164.8,196],[146.8,185,220],[123.5,155.6,185],[130.8,164.8,196]];
+    let ci = 0;
+    const os = ch[0].map(f => { const o = c.createOscillator(); o.type = 'triangle'; o.frequency.value = f; return o; });
+    const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 800;
+    const g = c.createGain(); g.gain.value = 0.018;
+    os.forEach(o => { o.connect(lp); o.start(); }); lp.connect(g); g.connect(c.destination); n.push(...os, lp, g);
+    (function chord() {
+      if (bgmCtx !== c) return;
+      ci = (ci+1) % ch.length;
+      os.forEach((o,i) => o.frequency.setTargetAtTime(ch[ci][i], c.currentTime, 0.5));
+      setTimeout(chord, 4000);
+    })();
+    layer('w', {type:'highpass',freq:5000}, 0.008);
+  }
+  bgmNodes = n;
+}
+function handleBGMClick(e) {
+  const btn = e.target.closest('.bgm-btn');
+  if (!btn) return;
+  document.querySelectorAll('.bgm-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  startBGM(btn.dataset.bgm);
+}
+document.getElementById('bgmBar').addEventListener('click', handleBGMClick);
+
+// ============================================================
+// Helpers
+// ============================================================
+let sharedData = null;
+
+// ============================================================
+// Screens
+// ============================================================
+const screens = { welcome: document.getElementById('welcomeScreen'), call: document.getElementById('callScreen') };
+function showScreen(name) {
+  Object.values(screens).forEach(s => s.classList.remove('active'));
+  screens[name].classList.add('active');
+  if (name === 'call') { startCallTimer(); document.getElementById('callInput').focus(); }
+  else stopCallTimer();
+}
+
+// Welcome
+function updateWelcomeGoal() {
+  document.getElementById('welcomeGoal').innerHTML = `<div class="welcome-goal-label">この電話のテーマ</div>${getGoal()}`;
+}
+document.getElementById('welcomeCall').onclick = () => {
+  showScreen('call');
+  startIntro();
+};
+
+// ============================================================
+// Intro — play pre-recorded YUKI greeting
+// ============================================================
+const ttsAudio = document.getElementById('ttsAudio');
+const transcriptEl = document.getElementById('transcript');
+const avatar = document.getElementById('callAvatar');
+
+function fmtText(t) {
+  const e = t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const lines = e.split('\n');
+  let out = '', inUl = false;
+  for (const ln of lines) {
+    const li = ln.match(/^\s*[-・]\s+(.+)/);
+    if (li) {
+      if (!inUl) { out += '<ul>'; inUl = true; }
+      out += `<li>${li[1]}</li>`;
+    } else {
+      if (inUl) { out += '</ul>'; inUl = false; }
+      out += (out ? '<br>' : '') + ln;
+    }
+  }
+  if (inUl) out += '</ul>';
+  return out.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+}
+function addTranscript(role, text) {
+  const el = document.createElement('div');
+  el.className = `transcript-entry ${role}`;
+  el.innerHTML = `<div class="transcript-label">${role === 'user' ? 'あなた' : 'YUKI'}</div><div class="transcript-text"></div>`;
+  el.querySelector('.transcript-text').innerHTML = fmtText(text);
+  transcriptEl.appendChild(el);
+  transcriptEl.scrollTop = transcriptEl.scrollHeight;
+  return el;
+}
+function setSpeaking(active, text) {
+  const ind = document.getElementById('speakingIndicator');
+  if (active) { ind.classList.add('active'); document.getElementById('speakingText').textContent = text || '話しています...'; }
+  else { ind.classList.remove('active'); stopTrivia(); }
+}
+function setAvatarState(state) { avatar.classList.remove('speaking', 'thinking'); if (state) avatar.classList.add(state); }
+
+async function playServerAudio(name) {
+  try {
+    const res = await fetch(`/api/audio/${name}`);
+    if (!res.ok) return false;
+    const blob = await res.blob();
+    ttsAudio.src = URL.createObjectURL(blob);
+    setSpeaking(true, '話しています...');
+    setAvatarState('speaking');
+    await ttsAudio.play();
+    await new Promise(r => ttsAudio.addEventListener('ended', r, { once: true }));
+    setSpeaking(false); setAvatarState(null);
+    return true;
+  } catch { return false; }
+}
+
+let conversationHistory = [];
+async function startIntro() {
+  addTranscript('ai', INTRO_TEXT);
+  conversationHistory = [{ role: 'assistant', content: INTRO_TEXT }];
+  await playServerAudio('intro');
+}
+
+// ============================================================
+// Call Timer
+// ============================================================
+let callTimerInterval, callStartTime;
+function startCallTimer() {
+  callStartTime = Date.now();
+  callTimerInterval = setInterval(() => {
+    const e = Math.floor((Date.now() - callStartTime) / 1000);
+    document.getElementById('callDuration').textContent = `${String(Math.floor(e / 60)).padStart(2, '0')}:${String(e % 60).padStart(2, '0')}`;
+  }, 1000);
+}
+function stopCallTimer() { clearInterval(callTimerInterval); }
+
+// ============================================================
+// STT — Web Speech API + MediaRecorder
+// ============================================================
+const callInput = document.getElementById('callInput');
+const inputActionBtn = document.getElementById('inputActionBtn');
+const sttStatus = document.getElementById('sttStatus');
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+let recognition = null, isListening = false, sttSilenceTimer = null;
+let rawRecorder = null, rawChunks = [], rawAudioBlob = null, rawAudioResolve = null;
+let hasAskedVoicePermission = false;
+let msgQueue = [], queueRunning = false;
+
+function initSTT() {
+  if (!SpeechRecognition) return;
+  recognition = new SpeechRecognition();
+  recognition.lang = 'ja-JP';
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.maxAlternatives = 1;
+  let finalText = '';
+
+  recognition.onstart = () => {
+    isListening = true;
+    inputActionBtn.classList.add('listening');
+    callInput.classList.add('listening');
+    sttStatus.textContent = '聴いています...';
+    finalText = '';
+  };
+  recognition.onresult = (e) => {
+    clearTimeout(sttSilenceTimer);
+    let interim = '';
+    finalText = '';
+    for (let i = 0; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) finalText += t;
+      else interim += t;
+    }
+    callInput.value = finalText + interim;
+    callInput.style.height = 'auto';
+    callInput.style.height = Math.min(callInput.scrollHeight, 120) + 'px';
+    sttStatus.textContent = interim ? '聴いています...' : '認識完了';
+    if (finalText && !interim) {
+      sttSilenceTimer = setTimeout(() => { stopSTT(); sendMessage(); }, 1500);
+    }
+  };
+  recognition.onerror = (e) => {
+    if (e.error === 'no-speech') sttStatus.textContent = '音声が検出されませんでした';
+    else if (e.error !== 'aborted') sttStatus.textContent = `エラー: ${e.error}`;
+    stopSTT();
+  };
+  recognition.onend = () => { if (isListening) { try { recognition.start(); } catch {} } };
+}
+
+function startSTT() {
+  ttsAudio.pause(); ttsAudio.currentTime = 0;
+  setSpeaking(false); setAvatarState(null);
+  callInput.value = '';
+  rawAudioBlob = null; rawChunks = [];
+
+  navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000, channelCount: 1 } })
+    .then(stream => {
+      rawRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+      rawChunks = [];
+      rawRecorder.ondataavailable = e => rawChunks.push(e.data);
+      rawRecorder.onstop = () => {
+        rawAudioBlob = new Blob(rawChunks, { type: 'audio/webm' });
+        stream.getTracks().forEach(t => t.stop());
+        if (rawAudioResolve) { rawAudioResolve(rawAudioBlob); rawAudioResolve = null; }
+      };
+      rawRecorder.start();
+    }).catch(() => {});
+
+  if (recognition) {
+    try { recognition.start(); } catch { recognition.stop(); setTimeout(() => recognition.start(), 100); }
+  } else {
+    isListening = true;
+    inputActionBtn.classList.add('listening');
+    callInput.classList.add('listening');
+    sttStatus.textContent = '録音中...';
+  }
+}
+
+function stopSTT() {
+  isListening = false;
+  clearTimeout(sttSilenceTimer);
+  inputActionBtn.classList.remove('listening');
+  callInput.classList.remove('listening');
+  updateActionButton();
+  try { recognition?.stop(); } catch {}
+  if (rawRecorder?.state === 'recording') rawRecorder.stop();
+  setTimeout(() => { if (sttStatus.textContent.startsWith('聴') || sttStatus.textContent === '録音中...') sttStatus.textContent = ''; }, 2000);
+}
+
+function waitForRawAudio() {
+  if (rawAudioBlob) return Promise.resolve(rawAudioBlob);
+  return new Promise(r => { rawAudioResolve = r; setTimeout(() => r(null), 3000); });
+}
+
+// Server-side STT (no client credentials needed)
+async function serverSTT(audioBlob) {
+  try {
+    const res = await fetch('/api/stt', { method: 'POST', body: audioBlob });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.text || null;
+  } catch { return null; }
+}
+
+// ============================================================
+// Unified Action Button (mic / send toggle)
+// ============================================================
+function updateActionButton() {
+  const hasText = callInput.value.trim().length > 0;
+  if (isListening) {
+    inputActionBtn.textContent = '⏹';
+    inputActionBtn.classList.add('listening');
+    inputActionBtn.classList.remove('send-mode');
+  } else if (hasText) {
+    inputActionBtn.textContent = '▶';
+    inputActionBtn.classList.add('send-mode');
+    inputActionBtn.classList.remove('listening');
+  } else {
+    inputActionBtn.textContent = '🎤';
+    inputActionBtn.classList.remove('send-mode', 'listening');
+  }
+}
+
+inputActionBtn.onclick = () => {
+  if (isListening) {
+    stopSTT();
+    if (callInput.value.trim()) sendMessage();
+  } else if (callInput.value.trim()) {
+    sendMessage();
+  } else {
+    startSTT();
+  }
+};
+
+callInput.addEventListener('input', () => {
+  callInput.style.height = 'auto';
+  callInput.style.height = Math.min(callInput.scrollHeight, 120) + 'px';
+  updateActionButton();
+});
+callInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendMessage(); } });
+initSTT();
+
+// ============================================================
+// Voice Clone — via /api/tts proxy
+// ============================================================
+async function generateClone(voiceRef, promptText, synthText) {
+  const safePromptText = (promptText && promptText.trim()) ? promptText : synthText.slice(0, 50);
+  try {
+    const res = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: synthText, mode: 'zero_shot', prompt_audio: voiceRef, prompt_text: safePromptText, format: 'mp3' }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.audio_base64) {
+      const bytes = Uint8Array.from(atob(data.audio_base64), c => c.charCodeAt(0));
+      return new Blob([bytes], { type: 'audio/mpeg' });
+    }
+    return null;
+  } catch { return null; }
+}
+
+async function playCloneAudio(audioBlob) {
+  if (!audioBlob) return;
+  ttsAudio.src = URL.createObjectURL(audioBlob);
+  setSpeaking(true, '話しています...');
+  setAvatarState('speaking');
+  try {
+    await ttsAudio.play();
+    await new Promise(r => ttsAudio.addEventListener('ended', r, { once: true }));
+  } catch {}
+  setSpeaking(false); setAvatarState(null);
+}
+
+// ============================================================
+// Permission flow — ask to use voice clone
+// ============================================================
+function showVoicePermission(audioBase64, userText, clonePromise) {
+  return new Promise(resolve => {
+    const shortText = userText.length > 30 ? userText.slice(0, 30) + '...' : userText;
+    const el = document.createElement('div');
+    el.className = 'transcript-entry ai';
+    el.innerHTML = `
+      <div class="transcript-label">YUKI</div>
+      <div class="transcript-text">いまの声で「${shortText}」って読み上げてみていい？</div>
+      <div class="permission-btns">
+        <button class="perm-yes">OK、やってみて</button>
+        <button class="perm-no">テキストだけでいい</button>
+      </div>`;
+    transcriptEl.appendChild(el);
+    transcriptEl.scrollTop = transcriptEl.scrollHeight;
+
+    el.querySelector('.perm-yes').onclick = async () => {
+      el.querySelector('.permission-btns').remove();
+      el.querySelector('.transcript-text').textContent = 'OK！いまの声で読み上げるね';
+      localStorage.setItem('voice_ref', audioBase64);
+      localStorage.setItem('voice_prompt_text', userText);
+      localStorage.setItem('voice_mode', 'clone');
+
+      setSpeaking(true, '音声生成中...'); setAvatarState('thinking'); startTrivia();
+      try {
+        const audioBlob = await clonePromise;
+        stopTrivia();
+        await playCloneAudio(audioBlob);
+      } catch {} finally { stopTrivia(); setSpeaking(false); setAvatarState(null); }
+
+      addTranscript('ai', PITCH_TEXT);
+      conversationHistory.push({ role: 'assistant', content: PITCH_TEXT });
+      await playServerAudio('pitch');
+      resolve();
+    };
+
+    el.querySelector('.perm-no').onclick = () => {
+      el.querySelector('.permission-btns').remove();
+      el.querySelector('.transcript-text').textContent = 'OK、テキストだけでいくね！';
+      localStorage.setItem('voice_mode', 'text_only');
+      resolve();
+    };
+  });
+}
+
+// ============================================================
+// Send Message
+// ============================================================
+async function sendMessage() {
+  let text = callInput.value.trim();
+  if (!text && !isListening && !rawRecorder) return;
+
+  const wasListening = isListening;
+  stopSTT(); sttStatus.textContent = '';
+  const capturedBlob = wasListening ? await waitForRawAudio() : null;
+
+  if (!text && capturedBlob && capturedBlob.size > 1000) {
+    sttStatus.textContent = '認識中...';
+    const serverText = await serverSTT(capturedBlob);
+    if (serverText) text = serverText;
+    sttStatus.textContent = '';
+  }
+
+  if (!text) return;
+  callInput.value = ''; callInput.style.height = 'auto';
+  updateActionButton();
+  addTranscript('user', text);
+  msgQueue.push({ text, capturedBlob });
+  if (!queueRunning) processQueue();
+}
+
+async function processQueue() {
+  queueRunning = true;
+  while (msgQueue.length > 0) {
+    await processMessage(msgQueue.shift());
+  }
+  queueRunning = false;
+}
+
+async function processMessage({ text, capturedBlob }) {
+  conversationHistory.push({ role: 'user', content: text });
+
+  const needPermission = !hasAskedVoicePermission
+    && !localStorage.getItem('voice_mode')
+    && !sharedData?.voice_ref
+    && capturedBlob && capturedBlob.size > 1000;
+
+  let clonePromise = null, audioB64 = null;
+  if (needPermission) {
+    hasAskedVoicePermission = true;
+    audioB64 = await blobToBase64(capturedBlob);
+    clonePromise = generateClone(audioB64, text, text);
+  }
+
+  setSpeaking(true, '考え中...'); setAvatarState('thinking');
+
+  try {
+    const chatRes = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'nvidia/NVIDIA-Nemotron-Nano-9B-v2-Japanese',
+        messages: [{ role: 'system', content: buildSystemPrompt() }, ...conversationHistory],
+        max_tokens: 128, temperature: 0.8,
+        chat_template_kwargs: { enable_thinking: false }
+      })
+    });
+    if (!chatRes.ok) {
+      const errData = await chatRes.json().catch(() => ({}));
+      throw new Error(errData.error || `API error ${chatRes.status}`);
+    }
+
+    const raw = (await chatRes.json()).choices?.[0]?.message?.content || '';
+    let answer = raw.includes('</think>') ? raw.split('</think>').pop().trim() : raw.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    answer = answer.replace(/^(Okay|Ok|Let me|I need to|The user|First,|So,|Wait,|Hmm)[\s\S]*?\n\n/i, '').trim();
+    if (!answer) throw new Error('Empty response');
+
+    conversationHistory.push({ role: 'assistant', content: answer });
+    addTranscript('ai', answer);
+    setSpeaking(false); setAvatarState(null);
+
+    if (needPermission && clonePromise) {
+      await showVoicePermission(audioB64, text, clonePromise);
+    } else {
+      const voiceMode = sharedData?.voice_ref ? 'clone' : localStorage.getItem('voice_mode');
+      if (voiceMode === 'clone') {
+        const voiceRef = sharedData?.voice_ref || localStorage.getItem('voice_ref');
+        const voicePromptText = sharedData?.voice_prompt_text || getConfig().voicePromptText;
+        if (voiceRef) fireAndPlayTTS(voiceRef, voicePromptText, answer);
+      }
+    }
+  } catch (e) {
+    addTranscript('ai', `(エラー: ${e.message})`);
+    console.error(e);
+    setSpeaking(false); setAvatarState(null);
+  }
+  transcriptEl.scrollTop = transcriptEl.scrollHeight;
+  callInput.focus();
+}
+
+async function brushUpForSpeech(text) {
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'nvidia/NVIDIA-Nemotron-Nano-9B-v2-Japanese',
+        messages: [
+          { role: 'system', content: '音声読み上げ用に変換。意味を変えず自然な話し言葉に。数字は読み仮名で。記号は除去。変換後のテキストのみ出力。' },
+          { role: 'user', content: text }
+        ],
+        max_tokens: 256, temperature: 0.3,
+        chat_template_kwargs: { enable_thinking: false }
+      })
+    });
+    if (!res.ok) return text;
+    const raw = (await res.json()).choices?.[0]?.message?.content || '';
+    let r = raw.includes('</think>') ? raw.split('</think>').pop().trim() : raw.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    return r || text;
+  } catch { return text; }
+}
+
+// Known CosyVoice2 SFT speaker leak phrases
+const LEAKED_PHRASES = ['週末どうお過ごし','お過ごしでしょうか','皆さんは週末','みなさんは週末','皆さん、','皆様'];
+
+async function trimAudioStart(blob, trimSec) {
+  try {
+    const ctx = new AudioContext();
+    const buf = await ctx.decodeAudioData(await blob.arrayBuffer());
+    const trimSamples = Math.min(Math.floor(trimSec * buf.sampleRate), buf.length - buf.sampleRate);
+    if (trimSamples <= 0) { ctx.close(); return blob; }
+    const newLen = buf.length - trimSamples;
+    const newBuf = ctx.createBuffer(buf.numberOfChannels, newLen, buf.sampleRate);
+    for (let ch = 0; ch < buf.numberOfChannels; ch++) {
+      newBuf.copyToChannel(buf.getChannelData(ch).slice(trimSamples), ch);
+    }
+    const offCtx = new OfflineAudioContext(buf.numberOfChannels, newLen, buf.sampleRate);
+    const src = offCtx.createBufferSource(); src.buffer = newBuf; src.connect(offCtx.destination); src.start();
+    const rendered = await offCtx.startRendering();
+    const wavBuf = encodeWAV(rendered);
+    ctx.close();
+    return new Blob([wavBuf], { type: 'audio/wav' });
+  } catch (e) { console.warn('[trim] failed:', e); return blob; }
+}
+
+function encodeWAV(audioBuf) {
+  const nc = audioBuf.numberOfChannels, sr = audioBuf.sampleRate, len = audioBuf.length;
+  const buf = new ArrayBuffer(44 + len * nc * 2);
+  const v = new DataView(buf);
+  const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  w(0,'RIFF'); v.setUint32(4, 36 + len * nc * 2, true); w(8,'WAVE'); w(12,'fmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, nc, true);
+  v.setUint32(24, sr, true); v.setUint32(28, sr * nc * 2, true);
+  v.setUint16(32, nc * 2, true); v.setUint16(34, 16, true); w(36,'data');
+  v.setUint32(40, len * nc * 2, true);
+  let o = 44;
+  for (let i = 0; i < len; i++) {
+    for (let ch = 0; ch < nc; ch++) {
+      const s = Math.max(-1, Math.min(1, audioBuf.getChannelData(ch)[i]));
+      v.setInt16(o, s < 0 ? s * 0x8000 : s * 0x7FFF, true); o += 2;
+    }
+  }
+  return buf;
+}
+
+async function verifyTTS(audioBlob, intendedText) {
+  try {
+    const stt = await serverSTT(audioBlob);
+    if (!stt) return { ok: true, blob: audioBlob };
+    const leak = LEAKED_PHRASES.find(p => stt.includes(p));
+    if (!leak) return { ok: true, blob: audioBlob, stt };
+    console.warn(`[TTS] Leaked: "${stt}" (found: "${leak}")`);
+    const leakIdx = stt.indexOf(leak);
+    const leakEnd = leakIdx + leak.length;
+    const leakChars = stt.slice(0, leakEnd).length;
+    const trimSec = leakChars * 0.15 + 0.3;
+    const trimmed = await trimAudioStart(audioBlob, trimSec);
+    return { ok: false, blob: trimmed, stt, leaked: leak, trimSec };
+  } catch { return { ok: true, blob: audioBlob }; }
+}
+
+async function fireAndPlayTTS(voiceRef, promptText, synthText) {
+  setSpeaking(true, '音声を生成中...'); setAvatarState('thinking'); startTrivia();
+  try {
+    const speechText = await brushUpForSpeech(synthText);
+    let audioBlob = await generateClone(voiceRef, promptText, speechText);
+    if (!audioBlob) { stopTrivia(); setSpeaking(false); setAvatarState(null); return; }
+
+    let result = await verifyTTS(audioBlob, speechText);
+    if (!result.ok) {
+      console.log(`[TTS] Trimmed ${result.trimSec?.toFixed(1)}s, retrying once...`);
+      const retry = await generateClone(voiceRef, speechText.slice(0, 30), speechText);
+      if (retry) {
+        const r2 = await verifyTTS(retry, speechText);
+        audioBlob = r2.blob;
+      } else {
+        audioBlob = result.blob;
+      }
+    } else {
+      audioBlob = result.blob;
+    }
+
+    stopTrivia();
+    ttsAudio.pause(); ttsAudio.currentTime = 0;
+    ttsAudio.src = URL.createObjectURL(audioBlob);
+    setSpeaking(true, '話しています...'); setAvatarState('speaking');
+    ttsAudio.play().catch(() => {});
+  } catch { stopTrivia(); setSpeaking(false); setAvatarState(null); }
+}
+
+ttsAudio.addEventListener('ended', () => { setSpeaking(false); setAvatarState(null); });
+
+// End call
+document.getElementById('endCallBtn').onclick = () => {
+  conversationHistory = []; transcriptEl.innerHTML = '';
+  msgQueue = []; queueRunning = false;
+  ttsAudio.pause(); ttsAudio.src = '';
+  stopSTT(); sttStatus.textContent = '';
+  hasAskedVoicePermission = false;
+  setSpeaking(false); setAvatarState(null); stopBGMAll(); stopCallTimer();
+  document.querySelectorAll('.bgm-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector('[data-bgm="none"]').classList.add('active');
+  document.getElementById('callDuration').textContent = '00:00';
+  showScreen('welcome');
+};
+
+// ============================================================
+// Settings
+// ============================================================
+const settingsModal = document.getElementById('settingsModal');
+let selectedVoice = localStorage.getItem('voice_mode') || 'none';
+
+function syncVoicePicks() {
+  document.querySelectorAll('.voice-pick').forEach(b => {
+    b.classList.toggle('active', b.dataset.voice === selectedVoice);
+  });
+  document.getElementById('voiceSettingsPanel').style.display = selectedVoice === 'clone' ? 'block' : 'none';
+}
+document.querySelectorAll('.voice-pick').forEach(b => {
+  b.onclick = () => { selectedVoice = b.dataset.voice; syncVoicePicks(); };
+});
+
+document.getElementById('settingsBtn').onclick = () => {
+  selectedVoice = localStorage.getItem('voice_mode') || 'none';
+  syncVoicePicks();
+  document.getElementById('cfgGoal').value = localStorage.getItem('conversation_goal') || DEFAULT_GOAL;
+  document.getElementById('cfgSystemPrompt').value = localStorage.getItem('system_prompt') || DEFAULT_SYSTEM_PROMPT;
+  document.getElementById('cfgAceEndpoint').value = localStorage.getItem('ace_step_endpoint') || '';
+  settingsModal.classList.add('active');
+};
+document.getElementById('settingsCancel').onclick = () => settingsModal.classList.remove('active');
+document.getElementById('settingsSave').onclick = () => {
+  const goal = document.getElementById('cfgGoal').value.trim();
+  const prompt = document.getElementById('cfgSystemPrompt').value.trim();
+  localStorage.setItem('voice_mode', selectedVoice || 'none');
+  if (goal && goal !== DEFAULT_GOAL) localStorage.setItem('conversation_goal', goal); else localStorage.removeItem('conversation_goal');
+  if (prompt && prompt !== DEFAULT_SYSTEM_PROMPT) localStorage.setItem('system_prompt', prompt); else localStorage.removeItem('system_prompt');
+  const ae = document.getElementById('cfgAceEndpoint').value.trim();
+  if (ae) localStorage.setItem('ace_step_endpoint', ae); else localStorage.removeItem('ace_step_endpoint');
+  settingsModal.classList.remove('active');
+};
+document.getElementById('goalResetBtn').onclick = () => { document.getElementById('cfgGoal').value = DEFAULT_GOAL; };
+document.getElementById('promptResetBtn').onclick = () => { document.getElementById('cfgSystemPrompt').value = DEFAULT_SYSTEM_PROMPT; };
+settingsModal.addEventListener('click', e => { if (e.target === settingsModal) settingsModal.classList.remove('active'); });
+
+// ============================================================
+// Voice Sample Generator
+// ============================================================
+const sampleCache = {};
+let previewAudio = null;
+
+function setupRefVoiceRec() {
+  const btn = document.getElementById('recRefBtn');
+  const status = document.getElementById('refRecStatus');
+  let rec = null, sttRec = null, recording = false, capturedText = '';
+
+  if (localStorage.getItem('voice_ref')) {
+    status.textContent = '録音済み ✓'; status.style.color = '#4ade80';
+    btn.textContent = '再録音';
+    renderVoiceSamples();
+  }
+
+  btn.onclick = async () => {
+    if (recording) { rec.stop(); if (sttRec) try { sttRec.stop(); } catch {} return; }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      rec = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+      const chunks = [];
+      rec.ondataavailable = e => chunks.push(e.data);
+      rec.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        recording = false; btn.textContent = '再録音';
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        status.textContent = '保存中...'; status.style.color = '#f59e0b';
+        const b64 = await blobToBase64(blob);
+        localStorage.setItem('voice_ref', b64);
+        localStorage.setItem('voice_prompt_text', capturedText || '');
+        status.textContent = `保存OK (${(blob.size/1024).toFixed(0)}KB)`; status.style.color = '#4ade80';
+        renderVoiceSamples();
+      };
+      capturedText = '';
+      if (SpeechRecognition) {
+        sttRec = new SpeechRecognition();
+        sttRec.lang = 'ja-JP'; sttRec.continuous = true; sttRec.interimResults = false;
+        sttRec.onresult = e => { for (let i = 0; i < e.results.length; i++) if (e.results[i].isFinal) capturedText += e.results[i][0].transcript; };
+        sttRec.onerror = () => {};
+        sttRec.start();
+      }
+      rec.start(); recording = true;
+      btn.textContent = '停止'; status.textContent = '10秒ほど自然に話してください...'; status.style.color = '#f59e0b';
+      setTimeout(() => { if (recording) { rec.stop(); if (sttRec) try { sttRec.stop(); } catch {} } }, 15000);
+    } catch { status.textContent = 'マイクエラー'; status.style.color = '#dc2626'; }
+  };
+}
+
+function renderVoiceSamples() {
+  const c = document.getElementById('voiceSamplesContainer');
+  if (!localStorage.getItem('voice_ref')) {
+    c.innerHTML = '<p style="color:#666;font-size:0.82rem;margin-top:8px;">基準音声を録音するとスクリプトが表示されます</p>';
+    return;
+  }
+  const sections = [
+    { title: 'イントロ音声（初回挨拶）', scripts: INTRO_SCRIPTS, audioName: 'intro' },
+    { title: 'ピッチ音声（ElioChat紹介）', scripts: PITCH_SCRIPTS, audioName: 'pitch' },
+  ];
+  c.innerHTML = sections.map(sec => `
+    <label style="margin-top:16px;display:block;font-weight:600;">${sec.title}</label>
+    ${sec.scripts.map(s => `
+      <div class="sample-card">
+        <div class="sample-label">${s.label}</div>
+        <div class="sample-text" onclick="this.classList.toggle('expanded')">${s.text}</div>
+        <div class="sample-actions">
+          <button onclick="genSample('${s.id}')" class="prompt-reset" id="${s.id}_gen">生成</button>
+          <button onclick="playSamplePreview('${s.id}')" class="prompt-reset" id="${s.id}_play" disabled>▶ 再生</button>
+          <button onclick="selectSample('${s.id}','${sec.audioName}')" class="prompt-reset sample-sel" id="${s.id}_sel" disabled>✓ 選択</button>
+          <span class="admin-rec-status" id="${s.id}_st"></span>
+        </div>
+      </div>
+    `).join('')}
+  `).join('');
+}
+
+async function genSample(id) {
+  const voiceRef = localStorage.getItem('voice_ref');
+  const promptText = localStorage.getItem('voice_prompt_text') || '';
+  if (!voiceRef) return;
+  const script = [...INTRO_SCRIPTS, ...PITCH_SCRIPTS].find(s => s.id === id);
+  if (!script) return;
+  const st = document.getElementById(`${id}_st`);
+  const btn = document.getElementById(`${id}_gen`);
+  btn.disabled = true; st.textContent = '生成中...'; st.style.color = '#f59e0b';
+  try {
+    const blob = await generateClone(voiceRef, promptText, script.text);
+    if (blob) {
+      sampleCache[id] = blob;
+      st.textContent = '✓ 完了'; st.style.color = '#4ade80';
+      document.getElementById(`${id}_play`).disabled = false;
+      document.getElementById(`${id}_sel`).disabled = false;
+    } else { st.textContent = 'エラー'; st.style.color = '#dc2626'; }
+  } catch { st.textContent = 'エラー'; st.style.color = '#dc2626'; }
+  btn.disabled = false;
+}
+
+function playSamplePreview(id) {
+  if (previewAudio) { previewAudio.pause(); previewAudio = null; }
+  const blob = sampleCache[id];
+  if (!blob) return;
+  previewAudio = new Audio(URL.createObjectURL(blob));
+  previewAudio.play();
+}
+
+async function selectSample(id, audioName) {
+  const blob = sampleCache[id];
+  if (!blob) return;
+  const st = document.getElementById(`${id}_st`);
+  st.textContent = 'アップロード中...'; st.style.color = '#f59e0b';
+  try {
+    const res = await fetch(`/api/audio/${audioName}`, { method: 'POST', body: blob });
+    if (res.ok) {
+      st.textContent = '✓ 設定完了！'; st.style.color = '#4ade80';
+      document.querySelectorAll(`.sample-card`).forEach(card => {
+        const selBtn = card.querySelector(`[id$="_sel"]`);
+        if (selBtn && selBtn.id.startsWith(audioName.replace('intro','intro_').replace('pitch','pitch_'))) {
+          card.style.borderLeftColor = '#333';
+        }
+      });
+      document.getElementById(`${id}_sel`).closest('.sample-card').style.borderLeftColor = '#22c55e';
+    } else { st.textContent = 'エラー'; st.style.color = '#dc2626'; }
+  } catch { st.textContent = 'エラー'; st.style.color = '#dc2626'; }
+}
+
+setupRefVoiceRec();
+
+// ============================================================
+// Share
+// ============================================================
+const shareModal = document.getElementById('shareModal');
+
+async function loadSharedData() {
+  const m = location.pathname.match(/^\/v\/([A-Za-z0-9]{8})$/);
+  if (!m) return null;
+  try {
+    const res = await fetch(`/api/share/${m[1]}`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch { return null; }
+}
+
+document.getElementById('sharePublic').addEventListener('change', e => {
+  document.getElementById('sharePublicNote').style.display = e.target.checked ? 'block' : 'none';
+});
+
+document.getElementById('shareBtn').onclick = () => {
+  const voiceRef = localStorage.getItem('voice_ref');
+  document.getElementById('shareGoal').value = getGoal();
+  document.getElementById('sharePrompt').value = localStorage.getItem('system_prompt') || DEFAULT_SYSTEM_PROMPT;
+  document.getElementById('shareIncludeVoice').checked = !!voiceRef;
+  document.getElementById('shareIncludeVoice').disabled = !voiceRef;
+  document.getElementById('shareVoiceStatus').textContent = voiceRef ? '録音済み' : '未録音';
+  document.getElementById('sharePublic').checked = false;
+  document.getElementById('sharePublicNote').style.display = 'none';
+  document.getElementById('shareUrlBox').style.display = 'none';
+  document.getElementById('sharePlayCount').style.display = 'none';
+  shareModal.classList.add('active');
+};
+
+document.getElementById('shareGenBtn').onclick = async () => {
+  const btn = document.getElementById('shareGenBtn');
+  btn.disabled = true; btn.textContent = 'アップロード中...';
+  const body = {
+    goal: document.getElementById('shareGoal').value.trim() || DEFAULT_GOAL,
+    prompt: document.getElementById('sharePrompt').value.trim() || DEFAULT_SYSTEM_PROMPT,
+    visibility: document.getElementById('sharePublic').checked ? 'public' : 'unlisted',
+  };
+  if (document.getElementById('shareIncludeVoice').checked) {
+    const v = localStorage.getItem('voice_ref');
+    if (v) { body.voice_ref = v; body.voice_prompt_text = localStorage.getItem('voice_prompt_text') || ''; }
+  }
+  try {
+    const res = await fetch('/api/share', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const data = await res.json();
+    if (data.url) { document.getElementById('shareUrl').value = data.url; document.getElementById('shareUrlBox').style.display = 'flex'; }
+    else throw new Error(data.error);
+  } catch (e) { alert('リンクの生成に失敗しました'); }
+  btn.disabled = false; btn.textContent = 'リンクを生成';
+};
+
+document.getElementById('shareCopyBtn').onclick = () => {
+  navigator.clipboard.writeText(document.getElementById('shareUrl').value).then(() => {
+    const m = document.getElementById('shareCopied'); m.style.display = 'block'; setTimeout(() => m.style.display = 'none', 2000);
+  });
+};
+document.getElementById('shareClose').onclick = () => shareModal.classList.remove('active');
+shareModal.addEventListener('click', e => { if (e.target === shareModal) shareModal.classList.remove('active'); });
+
+// ============================================================
+// Music Generation (ACE-Step)
+// ============================================================
+const musicModal = document.getElementById('musicModal');
+let generatedMusic = null;
+
+document.getElementById('musicBtn').onclick = () => {
+  document.getElementById('musicStatus').textContent = '';
+  document.getElementById('musicPreview').style.display = 'none';
+  musicModal.classList.add('active');
+};
+document.getElementById('musicClose').onclick = () => musicModal.classList.remove('active');
+musicModal.addEventListener('click', e => { if (e.target === musicModal) musicModal.classList.remove('active'); });
+
+document.getElementById('musicGenBtn').onclick = async () => {
+  const prompt = document.getElementById('musicPrompt').value.trim();
+  if (!prompt) return;
+  const duration = parseInt(document.getElementById('musicDuration').value) || 30;
+  const musicEndpoint = localStorage.getItem('ace_step_endpoint') || '';
+  const st = document.getElementById('musicStatus');
+  const btn = document.getElementById('musicGenBtn');
+
+  if (!musicEndpoint) {
+    st.textContent = '設定 → オプション → ACE-Step Endpoint IDを入力してください';
+    st.style.color = '#f59e0b';
+    return;
+  }
+
+  btn.disabled = true; st.textContent = '生成中...（30秒〜2分かかります）'; st.style.color = '#f59e0b';
+  try {
+    const res = await fetch('/api/music', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-music-endpoint': musicEndpoint },
+      body: JSON.stringify({ prompt, duration, instrumental: true }),
+    });
+    const data = await res.json();
+    if (data.audio_base64) {
+      const bytes = Uint8Array.from(atob(data.audio_base64), c => c.charCodeAt(0));
+      generatedMusic = new Blob([bytes], { type: 'audio/mpeg' });
+      st.textContent = '✓ 生成完了！'; st.style.color = '#4ade80';
+      document.getElementById('musicPreview').style.display = 'block';
+    } else {
+      st.textContent = data.error || 'エラー'; st.style.color = '#dc2626';
+    }
+  } catch (e) {
+    st.textContent = e.message; st.style.color = '#dc2626';
+  }
+  btn.disabled = false;
+};
+
+document.getElementById('musicPlayBtn').onclick = () => {
+  if (!generatedMusic) return;
+  if (previewAudio) previewAudio.pause();
+  previewAudio = new Audio(URL.createObjectURL(generatedMusic));
+  previewAudio.play();
+};
+
+document.getElementById('musicSaveBtn').onclick = async () => {
+  if (!generatedMusic) return;
+  const name = document.getElementById('musicName').value.trim() || 'custom';
+  const st = document.getElementById('musicStatus');
+  st.textContent = '保存中...'; st.style.color = '#f59e0b';
+  try {
+    const res = await fetch(`/api/bgm/${name}`, { method: 'POST', body: generatedMusic });
+    if (res.ok) {
+      st.textContent = `✓ "${name}" として保存しました。BGMバーに追加されます。`; st.style.color = '#4ade80';
+      addCustomBGM(name);
+    } else { st.textContent = 'エラー'; st.style.color = '#dc2626'; }
+  } catch { st.textContent = 'エラー'; st.style.color = '#dc2626'; }
+};
+
+function addCustomBGM(name) {
+  const bar = document.getElementById('bgmBar');
+  if (bar.querySelector(`[data-bgm="${name}"]`)) return;
+  const btn = document.createElement('button');
+  btn.className = 'bgm-btn';
+  btn.dataset.bgm = name;
+  btn.textContent = '🎵 ' + name;
+  bar.appendChild(btn);
+}
+
+// Override startBGM to try server-hosted BGM first
+const _originalStartBGM = startBGM;
+async function startBGMWithFetch(type) {
+  if (type === 'none') { _originalStartBGM('none'); return; }
+  try {
+    const res = await fetch(`/api/bgm/${type}`);
+    if (res.ok) {
+      stopBGM();
+      const blob = await res.blob();
+      if (!window._bgmAudio) { window._bgmAudio = new Audio(); window._bgmAudio.loop = true; window._bgmAudio.volume = 0.3; }
+      window._bgmAudio.src = URL.createObjectURL(blob);
+      window._bgmAudio.play().catch(() => {});
+      return;
+    }
+  } catch {}
+  _originalStartBGM(type);
+}
+const _origStopBGM = stopBGM;
+function stopBGMAll() {
+  _origStopBGM();
+  if (window._bgmAudio) { window._bgmAudio.pause(); window._bgmAudio.src = ''; }
+}
+document.getElementById('bgmBar').removeEventListener('click', handleBGMClick);
+document.getElementById('bgmBar').addEventListener('click', e => {
+  const btn = e.target.closest('.bgm-btn');
+  if (!btn) return;
+  document.querySelectorAll('.bgm-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  startBGMWithFetch(btn.dataset.bgm);
+});
+
+// ============================================================
+// Init
+// ============================================================
+(async function init() {
+  sharedData = await loadSharedData();
+
+  if (sharedData) {
+    updateWelcomeGoal();
+    if (sharedData.voice_ref) {
+      document.getElementById('welcomeSub').innerHTML = '共有された声とテーマでAIと電話できます。';
+    } else {
+      document.getElementById('welcomeSub').innerHTML = '共有されたテーマでAIと電話できます。';
+    }
+    showScreen('welcome');
+    return;
+  }
+
+  updateWelcomeGoal();
+  const voiceMode = localStorage.getItem('voice_mode');
+  if (voiceMode) {
+    hasAskedVoicePermission = true;
+    showScreen('call');
+  } else {
+    showScreen('welcome');
+  }
+})();
+</script>
+</body>
+</html>
