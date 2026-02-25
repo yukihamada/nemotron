@@ -11,6 +11,8 @@ const NEMOTRON_EP = process.env.NEMOTRON_ENDPOINT || '';
 const COSY_EP = process.env.COSYVOICE_ENDPOINT || '';
 const STT_EP = process.env.STT_ENDPOINT || '';
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
+const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || '';
+const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY || '';
 
 if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
 
@@ -133,31 +135,82 @@ Bun.serve({
       return new Response(null, { status: 204, headers: CORS_HEADERS });
     }
 
-    // ===== /api/chat — Proxy to Nemotron Serverless (OpenAI-compat) =====
+    // ===== /api/warmup — Pre-warm Nemotron worker =====
+    if (path === '/api/warmup' && req.method === 'GET') {
+      if (!RUNPOD_KEY || !NEMOTRON_EP) return Response.json({ status: 'not_configured' });
+      try {
+        const res = await fetch(`https://api.runpod.ai/v2/${NEMOTRON_EP}/health`, {
+          headers: { 'Authorization': `Bearer ${RUNPOD_KEY}` },
+          signal: AbortSignal.timeout(5000),
+        });
+        const data = await res.json();
+        const ready = (data.workers?.idle ?? 0) + (data.workers?.ready ?? 0) + (data.workers?.running ?? 0);
+        const initializing = data.workers?.initializing ?? 0;
+        const inQueue = data.jobs?.inQueue ?? 0;
+        log('info', '/api/warmup', 'Health', { ready, initializing, inQueue });
+        return Response.json({ ready, initializing, inQueue }, { headers: CORS_HEADERS });
+      } catch (e) {
+        return Response.json({ ready: 0, initializing: 0, inQueue: 0, error: e.message }, { headers: CORS_HEADERS });
+      }
+    }
+
+    // ===== /api/chat — RunPod Nemotron with Claude fallback =====
     if (path === '/api/chat' && req.method === 'POST') {
       const t0 = Date.now();
-      if (!RUNPOD_KEY || !NEMOTRON_EP) {
-        log('warn', '/api/chat', 'Endpoint not configured');
-        return Response.json({ error: 'Nemotron endpoint not configured' }, { status: 503 });
+      const body = await req.text();
+      const parsed = JSON.parse(body);
+      const msgCount = parsed.messages?.length || 0;
+      log('info', '/api/chat', 'Request', { messages: msgCount, max_tokens: parsed.max_tokens });
+
+      // Try RunPod first (20s fast timeout — skip if clearly unavailable)
+      if (RUNPOD_KEY && NEMOTRON_EP) {
+        try {
+          const upstream = `https://api.runpod.ai/v2/${NEMOTRON_EP}/openai/v1/chat/completions`;
+          const chatRes = await fetch(upstream, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${RUNPOD_KEY}`, 'Content-Type': 'application/json' },
+            body,
+            signal: AbortSignal.timeout(20_000),
+          });
+          if (chatRes.ok) {
+            log('info', '/api/chat', 'RunPod OK', { ms: Date.now() - t0 });
+            return new Response(chatRes.body, {
+              status: chatRes.status,
+              headers: { 'Content-Type': chatRes.headers.get('Content-Type') || 'application/json', ...HEADERS },
+            });
+          }
+        } catch (e) {
+          log('warn', '/api/chat', 'RunPod failed, falling back to Claude', { error: e.message, ms: Date.now() - t0 });
+        }
+      }
+
+      // OpenRouter fallback (Gemini 2.0 Flash — fast Japanese support)
+      if (!OPENROUTER_KEY) {
+        return Response.json({ error: 'AI service unavailable' }, { status: 503 });
       }
       try {
-        const body = await req.text();
-        const parsed = JSON.parse(body);
-        const msgCount = parsed.messages?.length || 0;
-        log('info', '/api/chat', 'Request', { messages: msgCount, max_tokens: parsed.max_tokens });
-        const upstream = `https://api.runpod.ai/v2/${NEMOTRON_EP}/openai/v1/chat/completions`;
-        const chatRes = await fetch(upstream, {
+        const orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${RUNPOD_KEY}`, 'Content-Type': 'application/json' },
-          body,
+          headers: {
+            'Authorization': `Bearer ${OPENROUTER_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-2.0-flash-001',
+            max_tokens: parsed.max_tokens || 256,
+            messages: parsed.messages || [],
+          }),
+          signal: AbortSignal.timeout(30_000),
         });
-        log('info', '/api/chat', 'Response', { status: chatRes.status, ms: Date.now() - t0 });
-        return new Response(chatRes.body, {
-          status: chatRes.status,
-          headers: { 'Content-Type': chatRes.headers.get('Content-Type') || 'application/json', ...HEADERS },
-        });
+        const data = await orRes.json();
+        const content = data.choices?.[0]?.message?.content || '';
+        log('info', '/api/chat', 'OpenRouter OK', { ms: Date.now() - t0 });
+        return Response.json({
+          choices: [{ message: { role: 'assistant', content }, finish_reason: 'stop' }],
+          model: 'gemini-2.0-flash',
+        }, { headers: HEADERS });
       } catch (e) {
-        log('error', '/api/chat', 'Failed', { error: e.message, ms: Date.now() - t0 });
+        log('error', '/api/chat', 'OpenRouter failed', { error: e.message, ms: Date.now() - t0 });
         return Response.json({ error: e.message }, { status: 502 });
       }
     }

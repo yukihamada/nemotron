@@ -296,6 +296,7 @@ audio { display: none; }
   <div class="welcome-btns" id="welcomeBtns">
     <button class="btn-primary" id="welcomeCall">電話をかける</button>
   </div>
+  <div id="aiStatus" style="margin-top:12px;font-size:0.78rem;color:#666;min-height:1.2em;text-align:center;"></div>
 </div>
 
 <!-- Call -->
@@ -681,7 +682,43 @@ function showScreen(name) {
 function updateWelcomeGoal() {
   document.getElementById('welcomeGoal').innerHTML = `<div class="welcome-goal-label">この電話のテーマ</div>${getGoal()}`;
 }
+
+// ============================================================
+// Warmup — poll /api/warmup to show AI readiness
+// ============================================================
+const aiStatusEl = document.getElementById('aiStatus');
+let warmupInterval = null;
+let aiReady = false;
+
+async function checkWarmup() {
+  try {
+    const res = await fetch('/api/warmup', { signal: AbortSignal.timeout(6000) });
+    if (!res.ok) return;
+    const data = await res.json();
+    const { ready = 0, initializing = 0, inQueue = 0 } = data;
+    if (ready > 0) {
+      aiReady = true;
+      aiStatusEl.textContent = '✓ AI準備完了';
+      aiStatusEl.style.color = '#22c55e';
+      clearInterval(warmupInterval);
+    } else if (initializing > 0) {
+      aiStatusEl.textContent = '⚙ AI起動中（初回は1〜2分かかります）';
+      aiStatusEl.style.color = '#f59e0b';
+    } else if (inQueue > 0) {
+      aiStatusEl.textContent = `⌛ キュー待機中（${inQueue}件）`;
+      aiStatusEl.style.color = '#888';
+    } else {
+      aiStatusEl.textContent = '⚙ AI起動中...';
+      aiStatusEl.style.color = '#888';
+    }
+  } catch { /* ignore */ }
+}
+
+checkWarmup();
+warmupInterval = setInterval(checkWarmup, 10_000);
+
 document.getElementById('welcomeCall').onclick = () => {
+  clearInterval(warmupInterval);
   showScreen('call');
   startIntro();
 };
@@ -1037,7 +1074,13 @@ async function processMessage({ text, capturedBlob }) {
     clonePromise = generateClone(audioB64, text, text);
   }
 
-  setSpeaking(true, '考え中...'); setAvatarState('thinking');
+  setSpeaking(true, aiReady ? '考え中...' : 'AI起動中（1〜2分）...'); setAvatarState('thinking');
+
+  // Show progressive message if AI was not ready
+  let coldStartTimer = null;
+  if (!aiReady) {
+    coldStartTimer = setTimeout(() => setSpeaking(true, '初回起動中です。しばらくお待ちください...'), 15_000);
+  }
 
   try {
     const chatRes = await fetch('/api/chat', {
@@ -1050,6 +1093,8 @@ async function processMessage({ text, capturedBlob }) {
         chat_template_kwargs: { enable_thinking: false }
       })
     });
+    clearTimeout(coldStartTimer);
+    aiReady = true;
     if (!chatRes.ok) {
       const errData = await chatRes.json().catch(() => ({}));
       throw new Error(errData.error || `API error ${chatRes.status}`);
@@ -1075,6 +1120,7 @@ async function processMessage({ text, capturedBlob }) {
       }
     }
   } catch (e) {
+    clearTimeout(coldStartTimer);
     addTranscript('ai', `(エラー: ${e.message})`);
     console.error(e);
     setSpeaking(false); setAvatarState(null);
