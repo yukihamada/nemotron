@@ -16,6 +16,9 @@ const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY || '';
 
 if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
 
+// Circuit breaker for RunPod (skip for 2 min after failure)
+const runpodCircuit = { failedAt: 0 };
+
 // ===== Logger =====
 function log(level, route, msg, meta = {}) {
   const entry = {
@@ -154,7 +157,7 @@ Bun.serve({
       }
     }
 
-    // ===== /api/chat — RunPod Nemotron with Claude fallback =====
+    // ===== /api/chat — RunPod Nemotron with Gemini fallback =====
     if (path === '/api/chat' && req.method === 'POST') {
       const t0 = Date.now();
       const body = await req.text();
@@ -162,8 +165,12 @@ Bun.serve({
       const msgCount = parsed.messages?.length || 0;
       log('info', '/api/chat', 'Request', { messages: msgCount, max_tokens: parsed.max_tokens });
 
-      // Try RunPod first (20s fast timeout — skip if clearly unavailable)
-      if (RUNPOD_KEY && NEMOTRON_EP) {
+      // Circuit breaker: skip RunPod if it failed within the last 2 minutes
+      const now = Date.now();
+      const runpodOpen = RUNPOD_KEY && NEMOTRON_EP
+        && (runpodCircuit.failedAt === 0 || now - runpodCircuit.failedAt > 120_000);
+
+      if (runpodOpen) {
         try {
           const upstream = `https://api.runpod.ai/v2/${NEMOTRON_EP}/openai/v1/chat/completions`;
           const chatRes = await fetch(upstream, {
@@ -173,14 +180,17 @@ Bun.serve({
             signal: AbortSignal.timeout(5_000),
           });
           if (chatRes.ok) {
+            runpodCircuit.failedAt = 0; // reset on success
             log('info', '/api/chat', 'RunPod OK', { ms: Date.now() - t0 });
             return new Response(chatRes.body, {
               status: chatRes.status,
               headers: { 'Content-Type': chatRes.headers.get('Content-Type') || 'application/json', ...HEADERS },
             });
           }
+          runpodCircuit.failedAt = now;
         } catch (e) {
-          log('warn', '/api/chat', 'RunPod failed, falling back to Claude', { error: e.message, ms: Date.now() - t0 });
+          runpodCircuit.failedAt = now;
+          log('warn', '/api/chat', 'RunPod failed, circuit open for 2min', { error: e.message, ms: Date.now() - t0 });
         }
       }
 
