@@ -170,7 +170,7 @@ Bun.serve({
             method: 'POST',
             headers: { 'Authorization': `Bearer ${RUNPOD_KEY}`, 'Content-Type': 'application/json' },
             body,
-            signal: AbortSignal.timeout(20_000),
+            signal: AbortSignal.timeout(5_000),
           });
           if (chatRes.ok) {
             log('info', '/api/chat', 'RunPod OK', { ms: Date.now() - t0 });
